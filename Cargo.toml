@@ -3,5 +3,11 @@
 resolver = "2"
 members = ["crates/*"]
 
+# bevy iterative compile perf
+[profile.dev]
+opt-level = 1
+[profile.dev.package."*"]
+opt-level = 3
+
 [workspace.dependencies]
 bevy = { version = "0.13" }
