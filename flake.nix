@@ -19,7 +19,10 @@
           extensions = [ "rust-src" "rust-analyzer" ];
         });
 
-        nativeBuildInputs = [ toolchain pkgs.pkg-config ];
+        nativeBuildInputs = with pkgs; [
+          toolchain mold clang
+          pkg-config
+        ];
         buildInputs = with pkgs; [
           udev alsa-lib vulkan-loader
           libxkbcommon wayland
