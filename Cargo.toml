@@ -4,4 +4,4 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.dependencies]
-
+bevy = { version = "0.13" }
