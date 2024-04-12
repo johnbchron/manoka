@@ -24,14 +24,15 @@
           pkg-config
         ];
         buildInputs = with pkgs; [
-          udev alsa-lib vulkan-loader
-          libxkbcommon wayland
+          udev alsa-lib vulkan-loader libGL # bevy deps
+          xorg.libX11 xorg.libXcursor xorg.libXi xorg.libXrandr # To use the x11 feature
+          libxkbcommon wayland # To use the wayland feature
         ];
 
       in {
         devShell = pkgs.mkShell {
           inherit buildInputs nativeBuildInputs;
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (buildInputs ++ nativeBuildInputs);
         };
       }
   );
