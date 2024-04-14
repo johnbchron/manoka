@@ -19,7 +19,7 @@ use bevy::{
 };
 
 const WINDOW_SIZE: (u32, u32) = (1280, 720);
-const WORKGROUP_SIZE: u32 = 8;
+const WORKGROUP_SIZE: u32 = 32;
 const CHUNK_SIZE: usize = 64 * 64 * 64;
 
 fn main() {
@@ -75,14 +75,15 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
       for x in 0..64 {
         let pos = Vec3::new(x as f32, y as f32, z as f32) / 64.0 - 0.5;
         let material = (pos.length() < 0.25) as u32;
-        voxel_buffer.push(Voxel { material });
+        let normal = pos.normalize();
+        voxel_buffer.push(Voxel { material, normal });
       }
     }
   }
 
   commands.insert_resource(RaytraceInputs {
     camera:         Camera {
-      pos:     Vec3::new(0.0, 0.0, 40.0),
+      pos:     Vec3::new(0.0, 40.0, 40.0),
       look_at: Vec3::ZERO,
       fov:     60.0_f32.to_radians(),
       up:      Vec3::Y,
@@ -98,16 +99,22 @@ fn move_camera(
   mut params: ResMut<RaytraceInputs>,
 ) {
   if keys.pressed(KeyCode::KeyW) {
-    params.camera.pos.z -= time.delta().as_secs_f32();
+    params.camera.pos.z -= time.delta().as_secs_f32() * 5.0;
   }
   if keys.pressed(KeyCode::KeyA) {
-    params.camera.pos.x -= time.delta().as_secs_f32();
+    params.camera.pos.x -= time.delta().as_secs_f32() * 5.0;
   }
   if keys.pressed(KeyCode::KeyS) {
-    params.camera.pos.z += time.delta().as_secs_f32();
+    params.camera.pos.z += time.delta().as_secs_f32() * 5.0;
   }
   if keys.pressed(KeyCode::KeyD) {
-    params.camera.pos.x += time.delta().as_secs_f32();
+    params.camera.pos.x += time.delta().as_secs_f32() * 5.0;
+  }
+  if keys.pressed(KeyCode::Space) {
+    params.camera.pos.y += time.delta().as_secs_f32() * 5.0;
+  }
+  if keys.pressed(KeyCode::ShiftLeft) {
+    params.camera.pos.y -= time.delta().as_secs_f32() * 5.0;
   }
 }
 
@@ -144,6 +151,7 @@ impl Plugin for RaytraceComputePlugin {
 #[derive(ShaderType, Clone)]
 pub struct Voxel {
   pub material: u32,
+  pub normal:   Vec3,
 }
 
 #[derive(ShaderType, Clone)]

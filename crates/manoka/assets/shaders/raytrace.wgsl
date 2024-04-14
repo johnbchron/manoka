@@ -8,11 +8,21 @@ struct Camera {
 
 struct Voxel {
   material: u32,
+  normal: vec3<f32>,
 };
 
 struct Ray {
   origin: vec3<f32>,
   dir: vec3<f32>,
+};
+
+struct RayHit {
+  hit: bool,
+  point: vec3<f32>,
+  normal: vec3<f32>,
+  chunk_coords: vec3<u32>,
+  steps: u32,
+  through_empty: u32,
 };
 
 const VOXEL_COUNT: u32 = 64*64*64;
@@ -21,14 +31,21 @@ const VOXEL_COUNT: u32 = 64*64*64;
 @group(0) @binding(1) var<storage> voxels: array<Voxel>; 
 @group(0) @binding(2) var output_texture: texture_storage_2d<rgba8unorm, read_write>;
 
-@compute @workgroup_size(8, 8, 1)
+@compute @workgroup_size(32, 32, 1)
 fn update(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
   let screen_coords: vec2<u32> = invocation_id.xy;
 
+  var output_color: vec3<f32> = vec3(0.0);
+
   let ray_dir: vec3<f32> = calculate_ray_dir(invocation_id);
   let ray = Ray(camera.pos, ray_dir);
+  let hit = cast_ray(ray);
 
-  var output_color: vec3<f32> = cast_ray(ray).xyz;
+  if (hit.hit) {
+    output_color = hit.normal;
+  } else {
+    output_color = ray_dir / 2.0 + 0.5;
+  }
 
   storageBarrier();
 
@@ -51,7 +68,7 @@ fn calculate_ray_dir(invocation_id: vec3<u32>) -> vec3<f32> {
   // Calculate the u,v,w unit basis vectors for the camera coordinate frame.
   let w = -normalize(camera.pos - camera.look_at);
   let u = normalize(cross(camera.up, w));
-  let v = cross(w, u);
+  let v = -cross(w, u);
 
   // Calculate the vectors across the horizontal and down the vertical viewport edges.
   let viewport_u = viewport_width * u;
@@ -78,10 +95,12 @@ fn sample_voxel(coords: vec3<u32>) -> Voxel {
   return voxels[coords.x + coords.y*64 + coords.z*64*64];
 }
 
-fn cast_ray(ray: Ray) -> vec4<f32> {
-  var p: vec3<f32> = floor(ray.origin) + .5;
+fn cast_ray(ray: Ray) -> RayHit {
+  var hit: RayHit = RayHit(false, vec3(0.0), vec3(0.0), vec3(0), 0, 0);
 
-	let dRd = 1.0 / abs(ray.dir);
+  var p: vec3<f32> = floor(ray.origin) + 0.5;
+
+	let dRd = 1.0 / max(abs(ray.dir), vec3(0.00001));
 
 	let rds = sign(ray.dir);
   var side: vec3<f32> = dRd * (rds * (p - ray.origin) + 0.5);
@@ -93,10 +112,21 @@ fn cast_ray(ray: Ray) -> vec4<f32> {
     // exit if we haven't converged in time
     if (i > 100) { break; } else { i++; }
 
+    hit.point = p;
+    hit.chunk_coords = vec3<u32>(p + 32);
+    hit.steps = i;
+
     // see if we've converged
-    let chunk_space_p = vec3<u32>(p + 32);
-    if (is_valid_voxel(chunk_space_p) && sample_voxel(chunk_space_p).material == 1) {
-      return vec4(p / 32.0 + 0.5, 1.0);
+    if (is_valid_voxel(hit.chunk_coords)) {
+      let voxel = sample_voxel(hit.chunk_coords);
+      if (voxel.material == 1) {
+        hit.hit = true;
+        // hit.normal = mask * sign(ray.dir);
+        hit.normal = voxel.normal;
+        break;
+      } else {
+        hit.through_empty = hit.through_empty + 1;
+      }
     }
 
     // step through
@@ -105,5 +135,5 @@ fn cast_ray(ray: Ray) -> vec4<f32> {
     p += mask * rds;
 	}
     
-  return vec4(vec3(ray.dir / 2.0 + 0.5), 1.0);
+  return hit;
 }
