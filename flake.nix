@@ -21,7 +21,7 @@
         });
 
         nativeBuildInputs = with pkgs; [
-          toolchain mold clang
+          toolchain mold clang bacon
           pkg-config
         ];
         buildInputs = with pkgs; [

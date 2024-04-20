@@ -13,16 +13,16 @@ opt-level = 3
 bevy = { version = "0.13", default-features = false, features = [
   "animation",
   "bevy_asset",
-  "bevy_audio",
+  # "bevy_audio",
   # "bevy_gilrs",
   "bevy_scene",
   "bevy_winit",
-  "bevy_core_pipeline",
+  # "bevy_core_pipeline",
   # "bevy_pbr",
   # "bevy_gltf",
   "bevy_render",
   # "bevy_sprite",
-  "bevy_text",
+  # "bevy_text",
   # "bevy_ui",
   "multi-threaded",
   "png",
@@ -36,3 +36,4 @@ bevy = { version = "0.13", default-features = false, features = [
   "webgl2",
   # "bevy_debug_stepping",
 ] }
+wgpu = { version = "0.19" }

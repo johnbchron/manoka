@@ -5,4 +5,6 @@ edition = "2021"
 
 [dependencies]
 bevy.workspace = true
-bevy_mod_debugdump = "0.10.0"
+bevy-inspector-egui = { version = "0.24" }
+bevy_mod_debugdump = "0.10"
+wgpu.workspace = true
