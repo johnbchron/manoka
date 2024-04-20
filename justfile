@@ -1,3 +1,3 @@
 
 run:
-	cargo run --bin manoka
+	WAYLAND_DISPLAY= WGPU_BACKEND=gl cargo run --bin manoka
