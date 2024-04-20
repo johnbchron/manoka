@@ -5,23 +5,9 @@ mod sun;
 use std::f32::consts::PI;
 
 use bevy::{
-  a11y::AccessibilityPlugin,
-  diagnostic::DiagnosticsPlugin,
-  input::InputPlugin,
-  log::LogPlugin,
-  prelude::*,
-  render::{
-    graph::CameraDriverLabel,
-    render_graph::{
-      Node, NodeRunError, RenderGraph, RenderGraphContext, RenderLabel,
-    },
-    renderer::RenderContext,
-    view::ExtractedWindows,
-    RenderApp, RenderPlugin,
-  },
-  scene::ScenePlugin,
-  window::PresentMode,
-  winit::WinitPlugin,
+  a11y::AccessibilityPlugin, diagnostic::DiagnosticsPlugin, input::InputPlugin,
+  log::LogPlugin, prelude::*, render::RenderPlugin, scene::ScenePlugin,
+  window::PresentMode, winit::WinitPlugin,
 };
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use sun::SunPlugin;
