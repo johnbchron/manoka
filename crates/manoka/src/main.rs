@@ -5,9 +5,9 @@ mod sun;
 use std::f32::consts::PI;
 
 use bevy::{
-  a11y::AccessibilityPlugin, diagnostic::DiagnosticsPlugin, input::InputPlugin,
-  log::LogPlugin, prelude::*, render::RenderPlugin, scene::ScenePlugin,
-  window::PresentMode, winit::WinitPlugin,
+  diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+  prelude::*,
+  window::PresentMode,
 };
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use sun::SunPlugin;
@@ -20,28 +20,21 @@ pub const CHUNK_VOXEL_COUNT: usize = 64 * 64 * 64;
 fn main() {
   let mut app = App::new();
 
-  // modified `DefaultPlugins`
-  app.add_plugins((
-    MinimalPlugins,
-    LogPlugin::default(),
-    HierarchyPlugin,
-    DiagnosticsPlugin::default(),
-    InputPlugin::default(),
-    WindowPlugin {
-      primary_window: Some(Window {
-        title: "manoka".to_string(),
-        mode: bevy::window::WindowMode::BorderlessFullscreen,
-        present_mode: PresentMode::AutoNoVsync,
-        ..default()
-      }),
+  // main first-party plugins
+  app.add_plugins(DefaultPlugins.set(WindowPlugin {
+    primary_window: Some(Window {
+      title: "manoka".to_string(),
+      mode: bevy::window::WindowMode::BorderlessFullscreen,
+      present_mode: PresentMode::AutoNoVsync,
       ..default()
-    },
-    AccessibilityPlugin,
-    AssetPlugin::default(),
-    ScenePlugin::default(),
-    WinitPlugin::default(),
-    RenderPlugin::default(),
-    ImagePlugin::default(),
+    }),
+    ..default()
+  }));
+
+  // other first-party plugins
+  app.add_plugins((
+    LogDiagnosticsPlugin::default(),
+    FrameTimeDiagnosticsPlugin::default(),
   ));
 
   // third party plugins
@@ -78,4 +71,15 @@ fn setup(mut commands: Commands, mut chunks: ResMut<Assets<Chunk>>) {
     )),
     Name::new("sun"),
   ));
+
+  // spawn a camera
+  commands.spawn(Camera3dBundle {
+    camera: Camera {
+      hdr: true,
+      ..default()
+    },
+
+    transform: Transform::from_xyz(-5.0, 50.0_f32.sqrt(), 5.0),
+    ..default()
+  });
 }

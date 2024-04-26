@@ -8,3 +8,4 @@ bevy.workspace = true
 bevy-inspector-egui = { version = "0.24" }
 bevy_mod_debugdump = "0.10"
 wgpu.workspace = true
+zerocopy.workspace = true

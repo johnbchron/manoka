@@ -17,7 +17,7 @@ bevy = { version = "0.13", default-features = false, features = [
   # "bevy_gilrs",
   "bevy_scene",
   "bevy_winit",
-  # "bevy_core_pipeline",
+  "bevy_core_pipeline",
   # "bevy_pbr",
   # "bevy_gltf",
   "bevy_render",
@@ -36,4 +36,5 @@ bevy = { version = "0.13", default-features = false, features = [
   "webgl2",
   # "bevy_debug_stepping",
 ] }
+zerocopy = { version = "0.7", features = [ "derive" ] }
 wgpu = { version = "0.19" }
