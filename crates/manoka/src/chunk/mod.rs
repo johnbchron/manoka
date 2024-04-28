@@ -15,6 +15,8 @@ use bevy_inspector_egui::inspector_egui_impls::InspectorEguiImpl;
 use wgpu::{util::BufferInitDescriptor, BufferUsages};
 use zerocopy::AsBytes;
 
+use crate::CHUNK_VOXEL_COUNT;
+
 #[derive(Clone, Debug, Reflect, ShaderType)]
 pub struct FullVoxel {
   normal: Vec3,
@@ -92,6 +94,12 @@ impl Chunk {
     }
 
     Chunk::Full { data: buffer }
+  }
+
+  pub fn new_empty() -> Self {
+    Self::Full {
+      data: vec![None; CHUNK_VOXEL_COUNT],
+    }
   }
 }
 

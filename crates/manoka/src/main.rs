@@ -52,6 +52,7 @@ fn main() {
 
 fn setup(mut commands: Commands, mut chunks: ResMut<Assets<Chunk>>) {
   let chunk_handle = chunks.add(Chunk::debug_red_sphere_chunk());
+  // let chunk_handle = chunks.add(Chunk::new_empty());
 
   // spawn a chunk
   commands.spawn((
