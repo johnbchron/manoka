@@ -50,9 +50,13 @@ impl Chunk {
 
     FullVoxel::assert_uniform_compat();
 
-    let occupancy_map = data.iter().map(|v| v.is_some()).collect::<Vec<_>>();
-    let mut occupancy_map_bytes = occupancy_map.as_bytes().to_vec();
+    let mut final_bytes: Vec<u8> = vec![];
 
+    // build the occupancy map
+    let occupancy_map = data.iter().map(|v| v.is_some()).collect::<Vec<_>>();
+    final_bytes.append(&mut occupancy_map.as_bytes().to_vec());
+
+    // collect the attributes into a dense list
     let attribute_size = FullVoxel::min_size().get() as usize;
     let dense_attributes = data
       .clone()
@@ -61,6 +65,7 @@ impl Chunk {
       .collect::<Vec<_>>();
     let attribute_count = dense_attributes.len();
 
+    // copy the attribute bytes into a vector
     let mut attribute_offset = 0;
     let mut attribute_bytes: Vec<u8> =
       vec![0; attribute_size * attribute_count];
@@ -69,10 +74,10 @@ impl Chunk {
         .copy_from_slice(&attribute.get_bytes());
       attribute_offset += attribute_size;
     }
+    final_bytes.append(&mut attribute_bytes);
 
-    occupancy_map_bytes.append(&mut attribute_bytes);
-    warn!("produced a buffer with {} bytes", occupancy_map_bytes.len());
-    occupancy_map_bytes
+    debug!("produced a buffer with {} bytes", final_bytes.len());
+    final_bytes
   }
 
   pub fn debug_red_sphere_chunk() -> Self {
@@ -120,7 +125,7 @@ impl RenderAsset for Chunk {
     Ok(GpuChunk(param.create_buffer_with_data(
       &BufferInitDescriptor {
         label:    Some("chunk_buffer"),
-        usage:    BufferUsages::STORAGE,
+        usage:    BufferUsages::COPY_SRC,
         contents: &buffer_data,
       },
     )))
