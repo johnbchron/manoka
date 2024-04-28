@@ -9,6 +9,7 @@ use bevy::{
     },
     render_resource::{Buffer, ShaderType},
     renderer::RenderDevice,
+    Extract, Render, RenderApp, RenderSet,
   },
 };
 use bevy_inspector_egui::inspector_egui_impls::InspectorEguiImpl;
@@ -76,7 +77,10 @@ impl Chunk {
     }
     final_bytes.append(&mut attribute_bytes);
 
-    debug!("produced a buffer with {} bytes", final_bytes.len());
+    debug!(
+      "created a chunk full_data buffer with {} bytes",
+      final_bytes.len()
+    );
     final_bytes
   }
 
@@ -101,6 +105,26 @@ impl Chunk {
     Chunk::Full { data: buffer }
   }
 
+  pub fn prepare_buffer_occupancy(&self) -> Vec<u8> {
+    let data = match self {
+      Self::Full { data } => data,
+    };
+
+    FullVoxel::assert_uniform_compat();
+
+    let mut final_bytes: Vec<u8> = vec![];
+
+    // build the occupancy map
+    let occupancy_map = data.iter().map(|v| v.is_some()).collect::<Vec<_>>();
+    final_bytes.append(&mut occupancy_map.as_bytes().to_vec());
+
+    debug!(
+      "created a chunk occupancy buffer with {} bytes",
+      final_bytes.len()
+    );
+    final_bytes
+  }
+
   pub fn new_empty() -> Self {
     Self::Full {
       data: vec![None; CHUNK_VOXEL_COUNT],
@@ -121,19 +145,60 @@ impl RenderAsset for Chunk {
     self,
     param: &mut SystemParamItem<Self::Param>,
   ) -> Result<Self::PreparedAsset, PrepareAssetError<Self>> {
-    let buffer_data = self.prepare_buffer_full_data();
+    let full_data_buffer = self.prepare_buffer_full_data();
+    let occupancy_buffer = self.prepare_buffer_occupancy();
     Ok(GpuChunk {
-      full_data: param.create_buffer_with_data(&BufferInitDescriptor {
+      _occupancy_buffer: param.create_buffer_with_data(&BufferInitDescriptor {
+        label:    Some("chunk_occupancy"),
+        contents: &occupancy_buffer,
+        usage:    BufferUsages::COPY_SRC,
+      }),
+      _full_data_buffer: param.create_buffer_with_data(&BufferInitDescriptor {
         label:    Some("chunk_full_data"),
         usage:    BufferUsages::COPY_SRC,
-        contents: &buffer_data,
+        contents: &full_data_buffer,
       }),
     })
   }
 }
 
 pub struct GpuChunk {
-  full_data: Buffer,
+  _occupancy_buffer: Buffer,
+  _full_data_buffer: Buffer,
+}
+
+fn extract_chunk_entities(
+  mut commands: Commands,
+  query: Extract<
+    Query<(Entity, &Handle<Chunk>, &GlobalTransform, &ViewVisibility)>,
+  >,
+) {
+  for (entity, chunk_handle, transform, visibility) in query.iter() {
+    commands.get_or_spawn(entity).insert((
+      chunk_handle.clone(),
+      transform.clone(),
+      visibility.clone(),
+    ));
+  }
+}
+
+#[derive(Resource)]
+pub struct RenderableChunks(pub Vec<Entity>);
+
+fn prepare_renderable_chunks(
+  mut commands: Commands,
+  query: Query<
+    (Entity, &ViewVisibility),
+    (With<Handle<Chunk>>, With<GlobalTransform>),
+  >,
+) {
+  commands.insert_resource(RenderableChunks(
+    query
+      .iter()
+      .filter(|(_, vv)| vv.get())
+      .map(|(e, _)| e)
+      .collect(),
+  ));
 }
 
 pub struct ChunkPlugin;
@@ -145,5 +210,18 @@ impl Plugin for ChunkPlugin {
       .init_asset::<Chunk>()
       .add_plugins(RenderAssetPlugin::<Chunk>::default())
       .register_type_data::<Chunk, InspectorEguiImpl>();
+  }
+
+  fn finish(&self, app: &mut App) {
+    let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
+      panic!("render_app not found");
+    };
+
+    render_app
+      .add_systems(ExtractSchedule, extract_chunk_entities)
+      .add_systems(
+        Render,
+        prepare_renderable_chunks.in_set(RenderSet::Prepare),
+      );
   }
 }

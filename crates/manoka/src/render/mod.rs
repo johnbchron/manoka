@@ -1,17 +1,21 @@
+mod unified_occupancy;
+
 use bevy::{
   prelude::*,
   render::{
-    render_graph::{EmptyNode, RenderGraphApp, RenderLabel, RenderSubGraph},
+    render_graph::{RenderGraphApp, RenderLabel, RenderSubGraph},
     RenderApp,
   },
 };
+
+use self::unified_occupancy::UnifiedOccupancyNode;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderSubGraph)]
 pub struct CoreVoxel;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 pub enum NodeVoxel {
-  DirectPass,
+  UnifiedOccupancy,
 }
 
 pub struct ManokaRenderPlugin;
@@ -23,9 +27,9 @@ impl Plugin for ManokaRenderPlugin {
     };
 
     render_app.add_render_sub_graph(CoreVoxel);
-    render_app
-      .add_render_graph_node::<EmptyNode>(CoreVoxel, NodeVoxel::DirectPass);
+    render_app.add_render_graph_node::<UnifiedOccupancyNode>(
+      CoreVoxel,
+      NodeVoxel::UnifiedOccupancy,
+    );
   }
 }
-
-pub struct DirectPassNode;

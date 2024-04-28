@@ -5,15 +5,23 @@ mod sun;
 use std::f32::consts::PI;
 
 use bevy::{
-  diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+  core_pipeline::tonemapping::{DebandDither, Tonemapping},
   prelude::*,
+  render::{
+    camera::{CameraMainTextureUsages, CameraRenderGraph, Exposure},
+    primitives::Frustum,
+    view::{ColorGrading, VisibleEntities},
+  },
   window::PresentMode,
 };
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use sun::SunPlugin;
 
-use self::{chunk::Chunk, render::ManokaRenderPlugin, sun::SunLight};
-use crate::chunk::ChunkPlugin;
+use crate::{
+  chunk::{Chunk, ChunkPlugin},
+  render::{CoreVoxel, ManokaRenderPlugin},
+  sun::SunLight,
+};
 
 pub const CHUNK_VOXEL_COUNT: usize = 64 * 64 * 64;
 
@@ -24,7 +32,7 @@ fn main() {
   app.add_plugins(DefaultPlugins.set(WindowPlugin {
     primary_window: Some(Window {
       title: "manoka".to_string(),
-      mode: bevy::window::WindowMode::BorderlessFullscreen,
+      // mode: bevy::window::WindowMode::BorderlessFullscreen,
       present_mode: PresentMode::AutoNoVsync,
       ..default()
     }),
@@ -33,8 +41,8 @@ fn main() {
 
   // other first-party plugins
   app.add_plugins((
-    LogDiagnosticsPlugin::default(),
-    FrameTimeDiagnosticsPlugin::default(),
+    // LogDiagnosticsPlugin::default(),
+    // FrameTimeDiagnosticsPlugin::default(),
   ));
 
   // third party plugins
@@ -74,13 +82,40 @@ fn setup(mut commands: Commands, mut chunks: ResMut<Assets<Chunk>>) {
   ));
 
   // spawn a camera
-  commands.spawn(Camera3dBundle {
-    camera: Camera {
+  // commands.spawn(Camera3dBundle {
+  //   camera:              Camera {
+  //     hdr: true,
+  //     ..default()
+  //   },
+  //   transform:           Transform::from_xyz(-5.0, 50.0_f32.sqrt(), 5.0),
+  //   camera_render_graph: todo!(),
+  //   projection:          todo!(),
+  //   visible_entities:    todo!(),
+  //   frustum:             todo!(),
+  //   global_transform:    todo!(),
+  //   camera_3d:           todo!(),
+  //   tonemapping:         todo!(),
+  //   dither:              todo!(),
+  //   color_grading:       todo!(),
+  //   exposure:            todo!(),
+  //   main_texture_usages: todo!(),
+  // });
+
+  commands.spawn((
+    Camera {
       hdr: true,
       ..default()
     },
-
-    transform: Transform::from_xyz(-5.0, 50.0_f32.sqrt(), 5.0),
-    ..default()
-  });
+    Transform::from_xyz(-5.0, 50.0_f32.sqrt(), 5.0),
+    CameraRenderGraph::new(CoreVoxel),
+    Projection::default(),
+    VisibleEntities::default(),
+    Frustum::default(),
+    GlobalTransform::default(),
+    Tonemapping::default(),
+    ColorGrading::default(),
+    Exposure::default(),
+    CameraMainTextureUsages::default(),
+    DebandDither::Enabled,
+  ));
 }
