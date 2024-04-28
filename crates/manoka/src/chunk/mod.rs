@@ -59,11 +59,8 @@ impl Chunk {
 
     // collect the attributes into a dense list
     let attribute_size = FullVoxel::min_size().get() as usize;
-    let dense_attributes = data
-      .clone()
-      .into_iter()
-      .filter_map(|v| v)
-      .collect::<Vec<_>>();
+    let dense_attributes =
+      data.clone().into_iter().flatten().collect::<Vec<_>>();
     let attribute_count = dense_attributes.len();
 
     // copy the attribute bytes into a vector
@@ -125,6 +122,7 @@ impl Chunk {
     final_bytes
   }
 
+  #[allow(dead_code)]
   pub fn new_empty() -> Self {
     Self::Full {
       data: vec![None; CHUNK_VOXEL_COUNT],
@@ -167,6 +165,7 @@ pub struct GpuChunk {
   _full_data_buffer: Buffer,
 }
 
+#[allow(clippy::type_complexity)]
 fn extract_chunk_entities(
   mut commands: Commands,
   query: Extract<
@@ -176,8 +175,8 @@ fn extract_chunk_entities(
   for (entity, chunk_handle, transform, visibility) in query.iter() {
     commands.get_or_spawn(entity).insert((
       chunk_handle.clone(),
-      transform.clone(),
-      visibility.clone(),
+      *transform,
+      *visibility,
     ));
   }
 }
@@ -185,6 +184,7 @@ fn extract_chunk_entities(
 #[derive(Resource)]
 pub struct RenderableChunks(pub Vec<Entity>);
 
+#[allow(clippy::type_complexity)]
 fn prepare_renderable_chunks(
   mut commands: Commands,
   query: Query<

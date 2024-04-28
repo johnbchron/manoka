@@ -23,7 +23,7 @@ fn extract_sun_lights(
     commands.get_or_spawn(entity).insert(ExtractedSunLight {
       color:       sun_light.color.as_linear_rgba_f32(),
       illuminance: sun_light.illuminance,
-      transform:   transform.clone(),
+      transform:   *transform,
     });
   }
 }

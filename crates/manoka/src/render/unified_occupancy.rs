@@ -26,9 +26,9 @@ impl Node for UnifiedOccupancyNode {
     for entity in renderable_chunks_list.iter() {
       let (handle, transform) = self
         .query_state
-        .get_manual(world, entity.clone())
+        .get_manual(world, *entity)
         .expect("failed to find renderable chunk in world");
-      chunks.insert(*entity, (handle.clone(), transform.clone()));
+      chunks.insert(*entity, (handle.clone(), *transform));
     }
 
     debug!(

@@ -5,7 +5,7 @@ use bevy_inspector_egui::{
 
 use super::Chunk;
 
-const CHUNK_INSPECTOR_MESSAGE: &'static str =
+const CHUNK_INSPECTOR_MESSAGE: &str =
   "I don't really know how to debug it right now, so I made this to avoid \
    crashing because of the default inspector implementation.";
 
