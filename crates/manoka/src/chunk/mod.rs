@@ -43,7 +43,7 @@ pub enum Chunk {
 }
 
 impl Chunk {
-  pub fn prepare_buffer_data(&self) -> Vec<u8> {
+  pub fn prepare_buffer_full_data(&self) -> Vec<u8> {
     let data = match self {
       Self::Full { data } => data,
     };
@@ -121,18 +121,20 @@ impl RenderAsset for Chunk {
     self,
     param: &mut SystemParamItem<Self::Param>,
   ) -> Result<Self::PreparedAsset, PrepareAssetError<Self>> {
-    let buffer_data = self.prepare_buffer_data();
-    Ok(GpuChunk(param.create_buffer_with_data(
-      &BufferInitDescriptor {
-        label:    Some("chunk_buffer"),
+    let buffer_data = self.prepare_buffer_full_data();
+    Ok(GpuChunk {
+      full_data: param.create_buffer_with_data(&BufferInitDescriptor {
+        label:    Some("chunk_full_data"),
         usage:    BufferUsages::COPY_SRC,
         contents: &buffer_data,
-      },
-    )))
+      }),
+    })
   }
 }
 
-pub struct GpuChunk(Buffer);
+pub struct GpuChunk {
+  full_data: Buffer,
+}
 
 pub struct ChunkPlugin;
 
