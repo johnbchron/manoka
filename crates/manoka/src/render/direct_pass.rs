@@ -42,9 +42,11 @@ impl Node for DirectPassNode {
     let pipeline_cache = world.resource::<PipelineCache>();
     let bind_groups = world.resource::<DirectPassBindGroups>();
 
-    let pipeline = pipeline_cache
-      .get_compute_pipeline(pipelines.pipeline)
-      .unwrap();
+    let Some(pipeline) =
+      pipeline_cache.get_compute_pipeline(pipelines.pipeline)
+    else {
+      return Ok(());
+    };
 
     render_context
       .command_encoder()
@@ -60,8 +62,7 @@ impl Node for DirectPassNode {
     pass.set_bind_group(0, &bind_groups.common, &[]);
     for (_, specific_bind_group) in bind_groups.specific.iter() {
       pass.set_bind_group(1, &specific_bind_group, &[]);
-      debug!("dispatching workgroups");
-      pass.dispatch_workgroups(8, 8, 8);
+      pass.dispatch_workgroups(16, 16, 16);
     }
 
     Ok(())
