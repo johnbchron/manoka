@@ -1,6 +1,8 @@
 use bevy::{
   prelude::*,
-  render::{Extract, RenderApp},
+  render::{
+    render_resource::ShaderType, Extract, Render, RenderApp, RenderSet,
+  },
 };
 
 use super::SunLight;
@@ -17,9 +19,9 @@ pub struct ExtractedSunLight {
 
 fn extract_sun_lights(
   mut commands: Commands,
-  sun_lights: Extract<Query<(Entity, &SunLight, &GlobalTransform)>>,
+  query: Extract<Query<(Entity, &SunLight, &GlobalTransform)>>,
 ) {
-  for (entity, sun_light, transform) in sun_lights.iter() {
+  for (entity, sun_light, transform) in query.iter() {
     commands.get_or_spawn(entity).insert(ExtractedSunLight {
       color:       sun_light.color.as_linear_rgba_f32(),
       illuminance: sun_light.illuminance,
@@ -28,12 +30,43 @@ fn extract_sun_lights(
   }
 }
 
+#[derive(Clone, Debug, ShaderType)]
+pub struct GpuSunLight {
+  color:       [f32; 4],
+  illuminance: f32,
+  direction:   Vec3,
+}
+
+impl From<ExtractedSunLight> for GpuSunLight {
+  fn from(value: ExtractedSunLight) -> Self {
+    GpuSunLight {
+      color:       value.color,
+      illuminance: value.illuminance,
+      direction:   value.transform.forward(),
+    }
+  }
+}
+
+#[derive(Resource)]
+pub struct SunLights(Vec<GpuSunLight>);
+
+fn prepare_sun_lights(
+  mut commands: Commands,
+  query: Query<&ExtractedSunLight>,
+) {
+  commands.insert_resource(SunLights(
+    query.iter().cloned().map(GpuSunLight::from).collect(),
+  ))
+}
+
 impl Plugin for SunRenderPlugin {
   fn build(&self, app: &mut App) {
     let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
       panic!("render_app not found");
     };
 
-    render_app.add_systems(ExtractSchedule, extract_sun_lights);
+    render_app
+      .add_systems(ExtractSchedule, extract_sun_lights)
+      .add_systems(Render, prepare_sun_lights.in_set(RenderSet::Prepare));
   }
 }

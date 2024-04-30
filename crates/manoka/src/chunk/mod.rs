@@ -33,8 +33,7 @@ pub struct GpuChunkOccupancy {
 }
 
 #[derive(Clone, Debug, ShaderType)]
-pub struct GpuChunkFull {
-  occupancy:  GpuChunkOccupancy,
+pub struct GpuChunkAttributes {
   #[size(runtime)]
   attributes: Vec<FullVoxel>,
 }
@@ -46,7 +45,7 @@ impl Chunk {
     }
   }
 
-  fn prepare_occupancy_buffer(&self) -> GpuChunkOccupancy {
+  fn prepare_occupancy(&self) -> GpuChunkOccupancy {
     let data = self.into_full();
     let occupancy_map = data.iter().map(|v| v.is_some()).collect::<Vec<_>>();
 
@@ -68,10 +67,9 @@ impl Chunk {
     }
   }
 
-  fn prepare_full_buffer(&self) -> GpuChunkFull {
+  fn prepare_attributes(&self) -> GpuChunkAttributes {
     let data = self.into_full();
-    GpuChunkFull {
-      occupancy:  self.prepare_occupancy_buffer(),
+    GpuChunkAttributes {
       attributes: data.into_iter().flatten().collect(),
     }
   }
@@ -106,7 +104,7 @@ impl Chunk {
 }
 
 impl RenderAsset for Chunk {
-  type PreparedAsset = ChunkBuffers;
+  type PreparedAsset = GpuChunk;
 
   type Param = ();
 
@@ -118,17 +116,17 @@ impl RenderAsset for Chunk {
     self,
     _param: &mut SystemParamItem<Self::Param>,
   ) -> Result<Self::PreparedAsset, PrepareAssetError<Self>> {
-    debug!("creating `ChunkBuffers`");
-    Ok(ChunkBuffers {
-      _occupancy_buffer: self.prepare_occupancy_buffer().into(),
-      _full_data_buffer: self.prepare_full_buffer().into(),
+    debug!("creating `GpuChunk`");
+    Ok(GpuChunk {
+      _occupancy:  self.prepare_occupancy(),
+      _attributes: self.prepare_attributes(),
     })
   }
 }
 
-pub struct ChunkBuffers {
-  _occupancy_buffer: StorageBuffer<GpuChunkOccupancy>,
-  _full_data_buffer: StorageBuffer<GpuChunkFull>,
+pub struct GpuChunk {
+  _occupancy:  GpuChunkOccupancy,
+  _attributes: GpuChunkAttributes,
 }
 
 #[allow(clippy::type_complexity)]
