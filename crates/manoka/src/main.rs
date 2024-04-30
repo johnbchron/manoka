@@ -6,6 +6,7 @@ use std::f32::consts::PI;
 
 use bevy::{
   core_pipeline::tonemapping::{DebandDither, Tonemapping},
+  diagnostic::FrameTimeDiagnosticsPlugin,
   prelude::*,
   render::{
     camera::{CameraMainTextureUsages, CameraRenderGraph, Exposure},
@@ -24,6 +25,8 @@ use crate::{
 };
 
 pub const CHUNK_VOXEL_COUNT: usize = 64 * 64 * 64;
+pub const MAX_CHUNKS: usize = 256;
+pub const MAX_SUN_LIGHTS: usize = 16;
 
 fn main() {
   let mut app = App::new();
@@ -42,7 +45,7 @@ fn main() {
   // other first-party plugins
   app.add_plugins((
     // LogDiagnosticsPlugin::default(),
-    // FrameTimeDiagnosticsPlugin::default(),
+    FrameTimeDiagnosticsPlugin::default(),
   ));
 
   // third party plugins
@@ -53,7 +56,7 @@ fn main() {
     .add_plugins((ManokaRenderPlugin, ChunkPlugin, SunPlugin))
     .add_systems(Startup, setup);
 
-  bevy_mod_debugdump::print_render_graph(&mut app);
+  // bevy_mod_debugdump::print_render_graph(&mut app);
 
   app.run();
 }

@@ -18,7 +18,7 @@ bevy = { version = "0.13", default-features = false, features = [
   "bevy_scene",
   "bevy_winit",
   "bevy_core_pipeline",
-  # "bevy_pbr",
+  "bevy_pbr",
   # "bevy_gltf",
   "bevy_render",
   # "bevy_sprite",

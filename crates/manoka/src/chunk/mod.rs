@@ -1,13 +1,14 @@
 mod inspector;
 use bevy::{
   asset::ReflectAsset,
-  ecs::system::SystemParamItem,
+  ecs::system::{lifetimeless::SRes, SystemParamItem},
   prelude::*,
   render::{
     render_asset::{
       PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssetUsages,
     },
     render_resource::{ShaderType, StorageBuffer},
+    renderer::{RenderDevice, RenderQueue},
     Extract, Render, RenderApp, RenderSet,
   },
 };
@@ -106,7 +107,7 @@ impl Chunk {
 impl RenderAsset for Chunk {
   type PreparedAsset = GpuChunk;
 
-  type Param = ();
+  type Param = (SRes<RenderDevice>, SRes<RenderQueue>);
 
   fn asset_usage(&self) -> RenderAssetUsages {
     RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD
@@ -114,19 +115,23 @@ impl RenderAsset for Chunk {
 
   fn prepare_asset(
     self,
-    _param: &mut SystemParamItem<Self::Param>,
+    (render_device, render_queue): &mut SystemParamItem<Self::Param>,
   ) -> Result<Self::PreparedAsset, PrepareAssetError<Self>> {
     debug!("creating `GpuChunk`");
+
+    let mut attribute_buffer = StorageBuffer::from(self.prepare_attributes());
+    attribute_buffer.write_buffer(render_device, render_queue);
+
     Ok(GpuChunk {
-      _occupancy:  self.prepare_occupancy(),
-      _attributes: self.prepare_attributes(),
+      occupancy: self.prepare_occupancy(),
+      attribute_buffer,
     })
   }
 }
 
 pub struct GpuChunk {
-  _occupancy:  GpuChunkOccupancy,
-  _attributes: GpuChunkAttributes,
+  pub occupancy:        GpuChunkOccupancy,
+  pub attribute_buffer: StorageBuffer<GpuChunkAttributes>,
 }
 
 #[allow(clippy::type_complexity)]
@@ -145,26 +150,6 @@ fn extract_chunk_entities(
   }
 }
 
-#[derive(Resource)]
-pub struct RenderableChunks(pub Vec<Entity>);
-
-#[allow(clippy::type_complexity)]
-fn prepare_renderable_chunks(
-  mut commands: Commands,
-  query: Query<
-    (Entity, &ViewVisibility),
-    (With<Handle<Chunk>>, With<GlobalTransform>),
-  >,
-) {
-  commands.insert_resource(RenderableChunks(
-    query
-      .iter()
-      .filter(|(_, vv)| vv.get())
-      .map(|(e, _)| e)
-      .collect(),
-  ));
-}
-
 pub struct ChunkPlugin;
 
 impl Plugin for ChunkPlugin {
@@ -181,11 +166,6 @@ impl Plugin for ChunkPlugin {
       panic!("render_app not found");
     };
 
-    render_app
-      .add_systems(ExtractSchedule, extract_chunk_entities)
-      .add_systems(
-        Render,
-        prepare_renderable_chunks.in_set(RenderSet::Prepare),
-      );
+    render_app.add_systems(ExtractSchedule, extract_chunk_entities);
   }
 }

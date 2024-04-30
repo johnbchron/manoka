@@ -1,7 +1,9 @@
 use bevy::{
   prelude::*,
   render::{
-    render_resource::ShaderType, Extract, Render, RenderApp, RenderSet,
+    render_resource::{ShaderType, StorageBuffer, UniformBuffer},
+    renderer::{RenderDevice, RenderQueue},
+    Extract, Render, RenderApp, RenderSet,
   },
 };
 
@@ -48,15 +50,24 @@ impl From<ExtractedSunLight> for GpuSunLight {
 }
 
 #[derive(Resource)]
-pub struct SunLights(Vec<GpuSunLight>);
+pub struct SunLightsBuffer(pub StorageBuffer<Vec<GpuSunLight>>);
 
 fn prepare_sun_lights(
   mut commands: Commands,
   query: Query<&ExtractedSunLight>,
+  render_device: Res<RenderDevice>,
+  render_queue: Res<RenderQueue>,
 ) {
-  commands.insert_resource(SunLights(
-    query.iter().cloned().map(GpuSunLight::from).collect(),
-  ))
+  let mut sun_lights_buffer = StorageBuffer::from(
+    query
+      .iter()
+      .cloned()
+      .map(GpuSunLight::from)
+      .collect::<Vec<_>>(),
+  );
+  sun_lights_buffer.write_buffer(&render_device, &render_queue);
+
+  commands.insert_resource(SunLightsBuffer(sun_lights_buffer));
 }
 
 impl Plugin for SunRenderPlugin {

@@ -607,6 +607,7 @@ dependencies = [
  "bevy_gizmos_macros",
  "bevy_log",
  "bevy_math",
+ "bevy_pbr",
  "bevy_reflect",
  "bevy_render",
  "bevy_transform",
