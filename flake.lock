@@ -76,16 +76,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1711460390,
-        "narHash": "sha256-akSgjDZL6pVHEfSE6sz1DNSXuYX6hq+P/1Z5IoYWs7E=",
-        "rev": "44733514b72e732bd49f5511bd0203dea9b9a434",
-        "revCount": 557010,
+        "lastModified": 1714531828,
+        "narHash": "sha256-ILsf3bdY/hNNI/Hu5bSt2/KbmHaAVhBbNUOdGztTHEg=",
+        "rev": "0638fe2715d998fa81d173aad264eb671ce2ebc1",
+        "revCount": 558121,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/NixOS/nixpkgs/0.2311.557010%2Brev-44733514b72e732bd49f5511bd0203dea9b9a434/018e7fb1-6425-7bf8-9105-2e6dcdc10701/source.tar.gz"
+        "url": "https://api.flakehub.com/f/pinned/NixOS/nixpkgs/0.2311.558121%2Brev-0638fe2715d998fa81d173aad264eb671ce2ebc1/018f3583-6e0d-7f3d-9871-ca7b6c8c73df/source.tar.gz"
       },
       "original": {
         "type": "tarball",
-        "url": "https://flakehub.com/f/NixOS/nixpkgs/0.2311.557010.tar.gz"
+        "url": "https://flakehub.com/f/NixOS/nixpkgs/0.2311.558121.tar.gz"
       }
     },
     "nixpkgs_2": {
@@ -120,16 +120,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1711505476,
-        "narHash": "sha256-yK1zue1c8EdpZvEyQWrjawG9Ykzl7eB2xJ/V+2vU5Jo=",
-        "rev": "56f48d6e7559b807763ea03191bfaf95549ce610",
-        "revCount": 1332,
+        "lastModified": 1714616033,
+        "narHash": "sha256-JcWAjIDl3h0bE/pII0emeHwokTeBl+SWrzwrjoRu7a0=",
+        "rev": "3e416d5067ba31ff8ac31eeb763e4388bdf45089",
+        "revCount": 1367,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/oxalica/rust-overlay/0.1.1332%2Brev-56f48d6e7559b807763ea03191bfaf95549ce610/018e7daf-6ce2-7bad-9ea3-9b7e07b471fd/source.tar.gz"
+        "url": "https://api.flakehub.com/f/pinned/oxalica/rust-overlay/0.1.1367%2Brev-3e416d5067ba31ff8ac31eeb763e4388bdf45089/018f3717-4aad-7657-a1ef-3685afb45c23/source.tar.gz"
       },
       "original": {
         "type": "tarball",
-        "url": "https://flakehub.com/f/oxalica/rust-overlay/0.1.1330.tar.gz"
+        "url": "https://flakehub.com/f/oxalica/rust-overlay/0.1.1367.tar.gz"
       }
     },
     "systems": {
