@@ -24,13 +24,15 @@
           toolchain mold clang bacon
           pkg-config
         ];
-        buildInputs = with pkgs; [
+        buildInputs = if !pkgs.stdenv.isDarwin then (with pkgs; [
           udev alsa-lib vulkan-loader
           xorg.libX11 xorg.libXcursor xorg.libXi xorg.libXrandr # To use the x11 feature
           vulkan-validation-layers
           libxkbcommon wayland
           wgsl-analyzer.packages."${system}".default
-        ];
+        ]) else (with pkgs; [
+          darwin.CF darwin.apple_sdk.frameworks.Cocoa darwin.apple_sdk.frameworks.CoreServices
+        ]);
 
       in {
         devShell = pkgs.mkShell {
