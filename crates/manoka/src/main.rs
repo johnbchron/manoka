@@ -6,7 +6,7 @@ use std::f32::consts::PI;
 
 use bevy::{
   core_pipeline::tonemapping::{DebandDither, Tonemapping},
-  diagnostic::FrameTimeDiagnosticsPlugin,
+  diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
   prelude::*,
   render::{
     camera::{CameraMainTextureUsages, CameraRenderGraph, Exposure},
@@ -44,7 +44,7 @@ fn main() {
 
   // other first-party plugins
   app.add_plugins((
-    // LogDiagnosticsPlugin::default(),
+    LogDiagnosticsPlugin::default(),
     FrameTimeDiagnosticsPlugin::default(),
   ));
 
@@ -67,9 +67,19 @@ fn setup(mut commands: Commands, mut chunks: ResMut<Assets<Chunk>>) {
 
   // spawn a chunk
   commands.spawn((
-    chunk_handle,
+    chunk_handle.clone(),
     SpatialBundle::default(),
     Name::new("test_chunk"),
+  ));
+  commands.spawn((
+    chunk_handle.clone(),
+    SpatialBundle::default(),
+    Name::new("test_chunk_2"),
+  ));
+  commands.spawn((
+    chunk_handle.clone(),
+    SpatialBundle::default(),
+    Name::new("test_chunk_3"),
   ));
 
   // spawn a sun
