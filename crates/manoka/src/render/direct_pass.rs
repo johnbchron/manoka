@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, num::NonZeroU32};
 
 use bevy::{
   ecs::entity::EntityHashMap,
@@ -13,18 +13,20 @@ use bevy::{
       BindGroup, BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries,
       Buffer, BufferDescriptor, CachedComputePipelineId,
       ComputePipelineDescriptor, PipelineCache, ShaderType, StorageBuffer,
-      UniformBuffer,
     },
     renderer::{RenderDevice, RenderQueue},
     Render, RenderApp, RenderSet,
   },
 };
-use wgpu::{BufferUsages, ComputePassDescriptor, ShaderStages};
+use wgpu::{
+  BindGroupLayoutEntry, BindingType, BufferBindingType, BufferUsages,
+  ComputePassDescriptor, ShaderStages,
+};
 
 use crate::{
   chunk::{Chunk, GpuChunkAttributes, GpuChunkOccupancy},
   sun::render::{GpuSunLight, SunLightsBuffer},
-  CHUNK_VOXEL_COUNT,
+  CHUNK_VOXEL_COUNT, MAX_CHUNKS,
 };
 
 pub struct DirectPassNode {
@@ -85,21 +87,21 @@ impl FromWorld for DirectPassNode {
 
 #[derive()]
 pub struct RenderedChunk {
-  index:                     u32,
+  entity:                    Entity,
   transform:                 GlobalTransform,
-  chunk_asset:               Handle<Chunk>,
+  chunk_asset_id:            AssetId<Chunk>,
+  occupancy_buffer:          Buffer,
+  attribute_buffer:          Buffer,
   direct_pass_output_buffer: Buffer,
-  direct_pass_uniform:       UniformBuffer<DirectPassUniform>,
 }
-
-#[derive(Resource)]
-pub struct ChunksToRender(pub EntityHashMap<RenderedChunk>);
 
 #[derive(Resource)]
 pub struct DirectPassGlobalBuffers {
-  om_buffer:        StorageBuffer<Vec<GpuChunkOccupancy>>,
   transform_buffer: StorageBuffer<Vec<Mat4>>,
 }
+
+#[derive(Resource)]
+pub struct ChunksToRender(pub Vec<RenderedChunk>);
 
 #[allow(clippy::type_complexity)]
 fn prepare_renderable_chunks(
@@ -109,73 +111,68 @@ fn prepare_renderable_chunks(
   render_queue: Res<RenderQueue>,
   chunks: Res<RenderAssets<Chunk>>,
 ) {
-  let mut sorted_entities =
-    query.iter().map(|(e, _, _, _)| e).collect::<Vec<_>>();
-  sorted_entities.sort_unstable_by_key(|e| e.index());
+  // get everything from the query, filter it by only view-visible items, then
+  // sort by the entity index.
+  let mut extracted_chunks = query
+    .iter()
+    .filter(|(_, _, _, vv)| vv.get())
+    .collect::<Vec<_>>();
+  extracted_chunks.sort_unstable_by_key(|(e, _, _, _)| e.index());
 
-  let mut chunks_to_render = EntityHashMap::default();
-  for (i, entity) in sorted_entities.iter().enumerate() {
-    let (entity, chunk_handle, transform, vv) = query.get(*entity).unwrap();
-    if !vv.get() {
-      continue;
-    }
+  // collect the `RenderedChunk`s from the extracted chunks
+  let mut chunks_to_render = Vec::new();
+  for (entity, chunk_handle, transform, _) in extracted_chunks.into_iter() {
+    // create the output buffer
+    let direct_pass_output_buffer =
+      render_device.create_buffer(&BufferDescriptor {
+        label:              Some("direct_pass_output_buffer"),
+        size:               DirectPassOutput::min_size().get(),
+        usage:              BufferUsages::STORAGE,
+        mapped_at_creation: false,
+      });
 
-    let mut direct_pass_uniform = UniformBuffer::from(DirectPassUniform {
-      current_chunk: i as _,
-    });
-    direct_pass_uniform.write_buffer(&render_device, &render_queue);
-    chunks_to_render.insert(entity, RenderedChunk {
-      index: i as _,
+    // pull the occupancy and attribute buffers out of the chunk asset
+    let occupancy_buffer = chunks
+      .get(chunk_handle.id())
+      .unwrap()
+      .occupancy_buffer
+      .buffer()
+      .unwrap()
+      .clone();
+    let attribute_buffer = chunks
+      .get(chunk_handle.id())
+      .unwrap()
+      .attribute_buffer
+      .buffer()
+      .unwrap()
+      .clone();
+
+    chunks_to_render.push(RenderedChunk {
+      entity: entity.clone(),
       transform: transform.clone(),
-      chunk_asset: chunk_handle.clone(),
-      direct_pass_output_buffer: render_device.create_buffer(
-        &BufferDescriptor {
-          label:              Some("direct_pass_output_buffer"),
-          size:               DirectPassOutput::min_size().get(),
-          usage:              BufferUsages::STORAGE,
-          mapped_at_creation: false,
-        },
-      ),
-      direct_pass_uniform,
-    });
+      chunk_asset_id: chunk_handle.id(),
+      occupancy_buffer,
+      attribute_buffer,
+      direct_pass_output_buffer,
+    })
   }
 
-  let mut global_om_buffer = StorageBuffer::from(
-    sorted_entities
-      .iter()
-      .map(|e| chunks_to_render.get(e).unwrap())
-      .map(|r| {
-        chunks
-          .get(r.chunk_asset.id())
-          .expect("failed to find chunk render asset from id")
-          .occupancy
-          .clone()
-      })
-      .collect::<Vec<_>>(),
-  );
-  global_om_buffer.write_buffer(&render_device, &render_queue);
-
   let mut global_transform_buffer = StorageBuffer::from(
-    sorted_entities
+    chunks_to_render
       .iter()
-      .map(|e| chunks_to_render.get(e).unwrap())
-      .map(|r| r.transform.compute_matrix())
+      .map(|e| e.transform.compute_matrix())
       .collect::<Vec<_>>(),
   );
   global_transform_buffer.write_buffer(&render_device, &render_queue);
 
   commands.insert_resource(ChunksToRender(chunks_to_render));
   commands.insert_resource(DirectPassGlobalBuffers {
-    om_buffer:        global_om_buffer,
     transform_buffer: global_transform_buffer,
   });
 }
 
 #[derive(Resource)]
-pub struct DirectPassBindGroups {
-  common:   BindGroup,
-  specific: EntityHashMap<BindGroup>,
-}
+pub struct DirectPassBindGroup(BindGroup);
 
 fn prepare_direct_pass_bind_groups(
   mut commands: Commands,
@@ -253,16 +250,48 @@ impl FromWorld for DirectPassPipeline {
       .resource::<AssetServer>()
       .load("shaders/direct_pass.wgsl");
 
-    let common_bind_group_layout = render_device.create_bind_group_layout(
-      "direct_pass_common_layout",
-      &BindGroupLayoutEntries::with_indices(
-        ShaderStages::COMPUTE,
-        (
-          (0, storage_buffer_read_only::<Vec<GpuChunkOccupancy>>(false)),
-          (1, storage_buffer_read_only::<Vec<Mat4>>(false)),
-          (2, storage_buffer_read_only::<Vec<GpuSunLight>>(false)),
-        ),
-      ),
+    let bind_group_layout = render_device.create_bind_group_layout(
+      "direct_pass_layout",
+      // &BindGroupLayoutEntries::with_indices(
+      //   ShaderStages::COMPUTE,
+      //   (
+      //     (0, storage_buffer_read_only::<Vec<GpuChunkOccupancy>>(false)),
+      //     (1, storage_buffer_read_only::<Vec<Mat4>>(false)),
+      //     (2, storage_buffer_read_only::<Vec<GpuSunLight>>(false)),
+      //   ),
+      // ),
+      &[
+        BindGroupLayoutEntry {
+          binding:    0,
+          visibility: ShaderStages::COMPUTE,
+          ty:         BindingType::Buffer {
+            ty:                 BufferBindingType::Storage { read_only: true },
+            has_dynamic_offset: false,
+            min_binding_size:   None,
+          },
+          count:      NonZeroU32::new(MAX_CHUNKS as u32),
+        },
+        BindGroupLayoutEntry {
+          binding:    1,
+          visibility: ShaderStages::COMPUTE,
+          ty:         BindingType::Buffer {
+            ty:                 BufferBindingType::Storage { read_only: true },
+            has_dynamic_offset: false,
+            min_binding_size:   Some(GpuChunkAttributes::min_size()),
+          },
+          count:      NonZeroU32::new(MAX_CHUNKS as u32),
+        },
+        BindGroupLayoutEntry {
+          binding:    2,
+          visibility: ShaderStages::COMPUTE,
+          ty:         BindingType::Buffer {
+            ty:                 BufferBindingType::Storage { read_only: true },
+            has_dynamic_offset: false,
+            min_binding_size:   None,
+          },
+          count:      None,
+        },
+      ],
     );
     let specific_bind_group_layout = render_device.create_bind_group_layout(
       "direct_pass_specifc_layout",

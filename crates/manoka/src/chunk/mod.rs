@@ -121,16 +121,18 @@ impl RenderAsset for Chunk {
 
     let mut attribute_buffer = StorageBuffer::from(self.prepare_attributes());
     attribute_buffer.write_buffer(render_device, render_queue);
+    let mut occupancy_buffer = StorageBuffer::from(self.prepare_occupancy());
+    occupancy_buffer.write_buffer(render_device, render_queue);
 
     Ok(GpuChunk {
-      occupancy: self.prepare_occupancy(),
+      occupancy_buffer,
       attribute_buffer,
     })
   }
 }
 
 pub struct GpuChunk {
-  pub occupancy:        GpuChunkOccupancy,
+  pub occupancy_buffer: StorageBuffer<GpuChunkOccupancy>,
   pub attribute_buffer: StorageBuffer<GpuChunkAttributes>,
 }
 
