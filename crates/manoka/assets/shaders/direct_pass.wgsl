@@ -25,6 +25,14 @@ struct FullVoxel {
   color: vec3<f32>,
 }
 
+fn chunk_index_from_invocation_id(invocation_id: vec3<u32>) -> u32 {
+  return (invocation_id.z - invocation_id.z % 64) / 64;
+}
+
+fn voxel_index_from_invocation_id(invocation_id: vec3<u32>) -> u32 {
+  return (invocation_id.z % 64) * 64 * 64 + invocation_id.y * 64 + invocation_id.x;
+}
+
 @group(0) @binding(0) var<storage> om_buffers: binding_array<ChunkOccupancy>; 
 @group(0) @binding(1) var<storage> attribute_buffers: binding_array<ChunkAttributes>;
 @group(0) @binding(2) var<storage, read_write> output_buffers: binding_array<DirectPassOutput>;
@@ -36,7 +44,7 @@ fn update(
   @builtin(global_invocation_id) invocation_id: vec3<u32>,
   @builtin(num_workgroups) num_workgroups: vec3<u32>,
 ) {
-  let chunk_index = (invocation_id.z - invocation_id.z % 64) / 64;
-  let index = (invocation_id.z % 64) * 64 * 64 + invocation_id.y * 64 + invocation_id.x;
+  let chunk_index = chunk_index_from_invocation_id(invocation_id);
+  let index = voxel_index_from_invocation_id(invocation_id);
   output_buffers[chunk_index].output[index] = vec3<f32>(invocation_id % 64) / 64;
 }
