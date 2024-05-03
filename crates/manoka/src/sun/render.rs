@@ -1,7 +1,7 @@
 use bevy::{
   prelude::*,
   render::{
-    render_resource::{ShaderType, StorageBuffer, UniformBuffer},
+    render_resource::{ShaderType, StorageBuffer},
     renderer::{RenderDevice, RenderQueue},
     Extract, Render, RenderApp, RenderSet,
   },

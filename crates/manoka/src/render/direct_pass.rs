@@ -1,30 +1,24 @@
 use std::{borrow::Cow, num::NonZeroU32};
 
 use bevy::{
-  ecs::entity::EntityHashMap,
   prelude::*,
   render::{
     render_asset::RenderAssets,
     render_graph::Node,
     render_resource::{
-      binding_types::{
-        storage_buffer, storage_buffer_read_only, uniform_buffer,
-      },
+      binding_types::{storage_buffer_read_only, storage_buffer_sized},
       BindGroup, BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries,
-      Buffer, BufferDescriptor, CachedComputePipelineId,
+      BindingResource, Buffer, BufferDescriptor, CachedComputePipelineId,
       ComputePipelineDescriptor, PipelineCache, ShaderType, StorageBuffer,
     },
     renderer::{RenderDevice, RenderQueue},
     Render, RenderApp, RenderSet,
   },
 };
-use wgpu::{
-  BindGroupLayoutEntry, BindingType, BufferBindingType, BufferUsages,
-  ComputePassDescriptor, ShaderStages,
-};
+use wgpu::{BufferUsages, ComputePassDescriptor, ShaderStages};
 
 use crate::{
-  chunk::{Chunk, GpuChunkAttributes, GpuChunkOccupancy},
+  chunk::Chunk,
   sun::render::{GpuSunLight, SunLightsBuffer},
   CHUNK_VOXEL_COUNT, MAX_CHUNKS,
 };
@@ -42,7 +36,7 @@ impl Node for DirectPassNode {
   ) -> Result<(), bevy::render::render_graph::NodeRunError> {
     let pipelines = world.resource::<DirectPassPipeline>();
     let pipeline_cache = world.resource::<PipelineCache>();
-    let bind_groups = world.resource::<DirectPassBindGroups>();
+    let bind_group = world.resource::<DirectPassBindGroup>();
 
     let Some(pipeline) =
       pipeline_cache.get_compute_pipeline(pipelines.pipeline)
@@ -61,11 +55,8 @@ impl Node for DirectPassNode {
       },
     );
     pass.set_pipeline(pipeline);
-    pass.set_bind_group(0, &bind_groups.common, &[]);
-    for (_, specific_bind_group) in bind_groups.specific.iter() {
-      pass.set_bind_group(1, &specific_bind_group, &[]);
-      pass.dispatch_workgroups(16, 16, 16);
-    }
+    pass.set_bind_group(0, &bind_group.0, &[]);
+    pass.dispatch_workgroups(16, 16, (16 * bind_group.1) as _);
 
     Ok(())
   }
@@ -87,9 +78,9 @@ impl FromWorld for DirectPassNode {
 
 #[derive()]
 pub struct RenderedChunk {
-  entity:                    Entity,
+  _entity:                   Entity,
   transform:                 GlobalTransform,
-  chunk_asset_id:            AssetId<Chunk>,
+  _chunk_asset_id:           AssetId<Chunk>,
   occupancy_buffer:          Buffer,
   attribute_buffer:          Buffer,
   direct_pass_output_buffer: Buffer,
@@ -148,9 +139,9 @@ fn prepare_renderable_chunks(
       .clone();
 
     chunks_to_render.push(RenderedChunk {
-      entity: entity.clone(),
+      _entity: entity.clone(),
       transform: transform.clone(),
-      chunk_asset_id: chunk_handle.id(),
+      _chunk_asset_id: chunk_handle.id(),
       occupancy_buffer,
       attribute_buffer,
       direct_pass_output_buffer,
@@ -172,57 +163,47 @@ fn prepare_renderable_chunks(
 }
 
 #[derive(Resource)]
-pub struct DirectPassBindGroup(BindGroup);
+/// This contains the bind group and the chunk count.
+pub struct DirectPassBindGroup(BindGroup, usize);
 
 fn prepare_direct_pass_bind_groups(
   mut commands: Commands,
   pipeline: Res<DirectPassPipeline>,
-  renderable_chunks: Res<ChunksToRender>,
+  chunks_to_render: Res<ChunksToRender>,
   global_buffers: Res<DirectPassGlobalBuffers>,
   sun_light_buffer: Res<SunLightsBuffer>,
   render_device: Res<RenderDevice>,
-  chunks: Res<RenderAssets<Chunk>>,
 ) {
-  let common = render_device.create_bind_group(
+  let om_buffers = chunks_to_render
+    .0
+    .iter()
+    .map(|c| c.occupancy_buffer.as_entire_buffer_binding())
+    .collect::<Vec<_>>();
+  let attribute_buffers = chunks_to_render
+    .0
+    .iter()
+    .map(|c| c.attribute_buffer.as_entire_buffer_binding())
+    .collect::<Vec<_>>();
+  let output_buffers = chunks_to_render
+    .0
+    .iter()
+    .map(|c| c.direct_pass_output_buffer.as_entire_buffer_binding())
+    .collect::<Vec<_>>();
+
+  let bind_group = render_device.create_bind_group(
     Some("direct_pass_common_bind_group"),
-    &pipeline.common_bind_group_layout,
+    &pipeline.bind_group_layout,
     &BindGroupEntries::with_indices((
-      (0, global_buffers.om_buffer.binding().unwrap()),
-      (1, global_buffers.transform_buffer.binding().unwrap()),
-      (2, sun_light_buffer.0.binding().unwrap()),
+      (0, BindingResource::BufferArray(&om_buffers)),
+      (1, BindingResource::BufferArray(&attribute_buffers)),
+      (2, BindingResource::BufferArray(&output_buffers)),
+      (3, global_buffers.transform_buffer.binding().unwrap()),
+      (4, sun_light_buffer.0.binding().unwrap()),
     )),
   );
 
-  let mut specific = EntityHashMap::default();
-  for (entity, renderable_chunk) in renderable_chunks.0.iter() {
-    specific.insert(
-      entity.clone(),
-      render_device.create_bind_group(
-        Some("direct_pass_specific_bind_group"),
-        &pipeline.specific_bind_group_layout,
-        &BindGroupEntries::with_indices((
-          (
-            0,
-            chunks
-              .get(renderable_chunk.chunk_asset.id())
-              .unwrap()
-              .attribute_buffer
-              .binding()
-              .unwrap(),
-          ),
-          (1, renderable_chunk.direct_pass_uniform.binding().unwrap()),
-          (
-            2,
-            renderable_chunk
-              .direct_pass_output_buffer
-              .as_entire_binding(),
-          ),
-        )),
-      ),
-    );
-  }
-
-  commands.insert_resource(DirectPassBindGroups { common, specific });
+  commands
+    .insert_resource(DirectPassBindGroup(bind_group, chunks_to_render.0.len()));
 }
 
 #[derive(Debug, ShaderType)]
@@ -237,9 +218,8 @@ struct DirectPassOutput {
 
 #[derive(Resource)]
 struct DirectPassPipeline {
-  common_bind_group_layout:   BindGroupLayout,
-  specific_bind_group_layout: BindGroupLayout,
-  pipeline:                   CachedComputePipelineId,
+  bind_group_layout: BindGroupLayout,
+  pipeline:          CachedComputePipelineId,
 }
 
 impl FromWorld for DirectPassPipeline {
@@ -252,55 +232,31 @@ impl FromWorld for DirectPassPipeline {
 
     let bind_group_layout = render_device.create_bind_group_layout(
       "direct_pass_layout",
-      // &BindGroupLayoutEntries::with_indices(
-      //   ShaderStages::COMPUTE,
-      //   (
-      //     (0, storage_buffer_read_only::<Vec<GpuChunkOccupancy>>(false)),
-      //     (1, storage_buffer_read_only::<Vec<Mat4>>(false)),
-      //     (2, storage_buffer_read_only::<Vec<GpuSunLight>>(false)),
-      //   ),
-      // ),
-      &[
-        BindGroupLayoutEntry {
-          binding:    0,
-          visibility: ShaderStages::COMPUTE,
-          ty:         BindingType::Buffer {
-            ty:                 BufferBindingType::Storage { read_only: true },
-            has_dynamic_offset: false,
-            min_binding_size:   None,
-          },
-          count:      NonZeroU32::new(MAX_CHUNKS as u32),
-        },
-        BindGroupLayoutEntry {
-          binding:    1,
-          visibility: ShaderStages::COMPUTE,
-          ty:         BindingType::Buffer {
-            ty:                 BufferBindingType::Storage { read_only: true },
-            has_dynamic_offset: false,
-            min_binding_size:   Some(GpuChunkAttributes::min_size()),
-          },
-          count:      NonZeroU32::new(MAX_CHUNKS as u32),
-        },
-        BindGroupLayoutEntry {
-          binding:    2,
-          visibility: ShaderStages::COMPUTE,
-          ty:         BindingType::Buffer {
-            ty:                 BufferBindingType::Storage { read_only: true },
-            has_dynamic_offset: false,
-            min_binding_size:   None,
-          },
-          count:      None,
-        },
-      ],
-    );
-    let specific_bind_group_layout = render_device.create_bind_group_layout(
-      "direct_pass_specifc_layout",
       &BindGroupLayoutEntries::with_indices(
         ShaderStages::COMPUTE,
         (
-          (0, storage_buffer_read_only::<GpuChunkAttributes>(false)),
-          (1, uniform_buffer::<DirectPassUniform>(false)),
-          (2, storage_buffer::<DirectPassOutput>(false)),
+          // all OM buffer bindings
+          (
+            0,
+            storage_buffer_sized(false, None)
+              .count(NonZeroU32::new(MAX_CHUNKS as _).unwrap()),
+          ),
+          // all attribute buffer bindings
+          (
+            1,
+            storage_buffer_sized(false, None)
+              .count(NonZeroU32::new(MAX_CHUNKS as _).unwrap()),
+          ),
+          // all output buffers
+          (
+            2,
+            storage_buffer_sized(false, None)
+              .count(NonZeroU32::new(MAX_CHUNKS as _).unwrap()),
+          ),
+          // chunk transforms
+          (3, storage_buffer_read_only::<Vec<Mat4>>(false)),
+          // sun parameters
+          (4, storage_buffer_read_only::<Vec<GpuSunLight>>(false)),
         ),
       ),
     );
@@ -309,10 +265,7 @@ impl FromWorld for DirectPassPipeline {
     let pipeline =
       pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
         label: Some(Cow::from("direct_pass_pipeline")),
-        layout: vec![
-          common_bind_group_layout.clone(),
-          specific_bind_group_layout.clone(),
-        ],
+        layout: vec![bind_group_layout.clone()],
         push_constant_ranges: vec![],
         shader,
         shader_defs: vec![],
@@ -320,8 +273,7 @@ impl FromWorld for DirectPassPipeline {
       });
 
     DirectPassPipeline {
-      common_bind_group_layout,
-      specific_bind_group_layout,
+      bind_group_layout,
       pipeline,
     }
   }

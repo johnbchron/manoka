@@ -9,7 +9,7 @@ use bevy::{
     },
     render_resource::{ShaderType, StorageBuffer},
     renderer::{RenderDevice, RenderQueue},
-    Extract, Render, RenderApp, RenderSet,
+    Extract, RenderApp,
   },
 };
 use bevy_inspector_egui::inspector_egui_impls::InspectorEguiImpl;
