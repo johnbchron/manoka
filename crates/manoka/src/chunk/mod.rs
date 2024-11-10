@@ -40,14 +40,14 @@ pub struct GpuChunkAttributes {
 }
 
 impl Chunk {
-  fn into_full(&self) -> Vec<Option<FullVoxel>> {
+  fn into_full(self) -> Vec<Option<FullVoxel>> {
     match self {
       Self::Full { data } => data.clone(),
     }
   }
 
   fn prepare_occupancy(&self) -> GpuChunkOccupancy {
-    let data = self.into_full();
+    let data = self.clone().into_full();
     let occupancy_map = data.iter().map(|v| v.is_some()).collect::<Vec<_>>();
 
     // transform array of bools into u32s
@@ -69,7 +69,7 @@ impl Chunk {
   }
 
   fn prepare_attributes(&self) -> GpuChunkAttributes {
-    let data = self.into_full();
+    let data = self.clone().into_full();
     GpuChunkAttributes {
       attributes: data.into_iter().flatten().collect(),
     }

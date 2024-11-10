@@ -41,12 +41,11 @@ fn main() {
     }),
     ..default()
   }));
+  // app.add_plugins(DefaultPlugins);
 
   // other first-party plugins
-  app.add_plugins((
-    LogDiagnosticsPlugin::default(),
-    FrameTimeDiagnosticsPlugin::default(),
-  ));
+  app
+    .add_plugins((LogDiagnosticsPlugin::default(), FrameTimeDiagnosticsPlugin));
 
   // third party plugins
   app.add_plugins(WorldInspectorPlugin::default());

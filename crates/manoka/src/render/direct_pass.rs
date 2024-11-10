@@ -139,8 +139,8 @@ fn prepare_renderable_chunks(
       .clone();
 
     chunks_to_render.push(RenderedChunk {
-      _entity: entity.clone(),
-      transform: transform.clone(),
+      _entity: entity,
+      transform: *transform,
       _chunk_asset_id: chunk_handle.id(),
       occupancy_buffer,
       attribute_buffer,
