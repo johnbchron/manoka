@@ -1,8 +1,8 @@
 {
   inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2311.558121.tar.gz";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     rust-overlay = {
-      url = "https://flakehub.com/f/oxalica/rust-overlay/0.1.1367.tar.gz";
+      url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     wgsl-analyzer.url = "github:wgsl-analyzer/wgsl-analyzer";
@@ -21,15 +21,20 @@
         });
 
         nativeBuildInputs = with pkgs; [
-          toolchain mold clang bacon
-          pkg-config
+          toolchain pkg-config clang
+          alsa-lib udev
+
+          libxkbcommon wayland
+          xorg.libX11 xorg.libXcursor xorg.libXi xorg.libXrandr
+ 
+          vulkan-headers vulkan-loader
+          vulkan-tools vulkan-tools-lunarg
+          vulkan-extension-layer
+          vulkan-validation-layers
+
+          wgsl-analyzer.packages."${system}".default
         ];
         buildInputs = if !pkgs.stdenv.isDarwin then (with pkgs; [
-          udev alsa-lib vulkan-loader
-          xorg.libX11 xorg.libXcursor xorg.libXi xorg.libXrandr # To use the x11 feature
-          vulkan-validation-layers
-          libxkbcommon wayland
-          wgsl-analyzer.packages."${system}".default
         ]) else (with pkgs; [
           darwin.CF darwin.apple_sdk.frameworks.Cocoa darwin.apple_sdk.frameworks.CoreServices
         ]);
@@ -37,11 +42,7 @@
       in {
         devShell = pkgs.mkShell {
           inherit buildInputs nativeBuildInputs;
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
-
-          shellHook = ''
-            export LD_LIBRARY_PATH="$GLOBAL_LIBGL:$LD_LIBRARY_PATH"
-          '';
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath nativeBuildInputs;
         };
       }
   );
